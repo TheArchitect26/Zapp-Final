@@ -5,8 +5,14 @@ import type { Database } from './types';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-// Import the supabase client like this:
-// import { supabase } from "@/integrations/supabase/client";
+if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+  document.body.innerHTML = `<div style="font-family:sans-serif;padding:2rem;color:#c00">
+    <h2>Configuration Error</h2>
+    <p>Missing <code>VITE_SUPABASE_URL</code> or <code>VITE_SUPABASE_PUBLISHABLE_KEY</code> environment variables.</p>
+    <p>Add them in Vercel → Settings → Environment Variables, then redeploy.</p>
+  </div>`;
+  throw new Error("Missing Supabase env vars");
+}
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {

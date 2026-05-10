@@ -48,6 +48,10 @@ export async function requestWithdrawal(req, res, next) {
     }
 
     // ── Per-user pending withdrawal cap ───────────────────────────────────────
+    // NOTE: This is a best-effort application-level check. Two concurrent requests
+    // can both pass this check before either creates a withdrawal (TOCTOU race).
+    // The authoritative cap must also be enforced inside the process_withdrawal
+    // DB function to be race-safe. This check is a fast-fail UX optimization only.
     const MAX_PENDING_WITHDRAWALS = Number(process.env.MAX_PENDING_WITHDRAWALS || 3);
     const { count: pendingCount } = await supabaseAdmin
       .from("withdrawal_requests")

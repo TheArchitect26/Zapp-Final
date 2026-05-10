@@ -18,6 +18,15 @@ export async function initiateKYC(req, res, next) {
       return res.status(400).json({ success: false, error: "Invalid SA ID number" });
     }
 
+    // Sanitize name fields: letters, spaces, hyphens only; max 50 chars each
+    const nameRe = /^[a-zA-Z\s'-]{1,50}$/;
+    const safeName = (v) => String(v).trim();
+    if (!nameRe.test(safeName(first_name)) || !nameRe.test(safeName(last_name))) {
+      return res.status(400).json({ success: false, error: "Invalid name format" });
+    }
+    const safeFirst = safeName(first_name);
+    const safeLast  = safeName(last_name);
+
     const { data: profile } = await supabaseAdmin
       .from("profiles").select("kyc_status").eq("user_id", userId).single();
     if (profile?.kyc_status === "verified") {
@@ -46,8 +55,8 @@ export async function initiateKYC(req, res, next) {
         id_type: "NATIONAL_ID",
         country: "ZA",
         id_number,
-        first_name,
-        last_name,
+        first_name: safeFirst,
+        last_name: safeLast,
         callback_url: process.env.SMILE_CALLBACK_URL,
       }),
     });

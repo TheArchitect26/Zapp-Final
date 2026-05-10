@@ -15,16 +15,15 @@ const server = createServer(app);
 initSocket(server);
 
 async function start() {
-  // Start listening first so /health is reachable during startup
+  // Validate env vars before opening the port — fail fast before accepting traffic.
+  validateEnv();
+
+  // Start listening after validation so /health is reachable during the rest of startup.
   await new Promise((resolve) => server.listen(PORT, resolve));
   logger.info("Zapp Money backend listening", {
     port: PORT,
     env: process.env.NODE_ENV || "development",
   });
-
-  // Validate env vars after server is up — crash here still lets healthcheck pass
-  // during the window before Railway marks the deploy failed
-  validateEnv();
 
   await initDatabase();
   initDecisionAuditor();
@@ -43,7 +42,13 @@ start().catch((err) => {
 
 const shutdown = async () => {
   logger.info("Shutting down...");
+  // Stop accepting new connections, then wait for in-flight requests to finish.
   server.close(() => process.exit(0));
+  // closeAllConnections() is available in Node 18.2+ and forcibly closes idle
+  // keep-alive connections so server.close() resolves promptly.
+  if (typeof server.closeAllConnections === "function") {
+    server.closeAllConnections();
+  }
 };
 
 process.on("SIGINT", shutdown);

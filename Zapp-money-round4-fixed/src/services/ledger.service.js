@@ -52,7 +52,8 @@ export async function createTransaction(data, idempotencyKey = null, executor = 
       [namespacedKey]
     );
     if (prior.rows.length) {
-      return { transactionId: prior.rows[0].transaction_id, cached: true };
+      // Return the same shape callers expect ({ id, ...clean }) so tx.id is never undefined.
+      return { id: prior.rows[0].transaction_id, ...clean, cached: true };
     }
   }
 

@@ -4,6 +4,7 @@ import { runFraudPipeline } from "../fraud/fraudPipeline.js";
 import { z } from "zod";
 import { db } from "../db/index.js";
 import { logger } from "../lib/logger.js";
+import { checkThrottle } from "../lib/throttle.js";
 
 const sendMoneySchema = z.object({
   senderId: z.string().uuid("senderId must be a UUID"),
@@ -90,6 +91,9 @@ export async function sendMoney(req, res, next) {
       return res.status(404).json({ success: false, error: "WALLET_NOT_FOUND" });
     }
     if (Number(sender.balance) < numericAmount) {
+      // Pre-check only — the authoritative balance enforcement happens inside
+      // the transfer_funds RPC. This check is a fast-fail UX optimization and
+      // does NOT replace the DB-level constraint.
       return res.status(400).json({ success: false, error: "INSUFFICIENT_BALANCE" });
     }
 
@@ -112,6 +116,16 @@ export async function sendMoney(req, res, next) {
     if (fraudResult.enforcement === "BLOCK" || fraudResult.enforcement === "REVIEW") {
       await learnFraud({ entityId: senderId, amount: numericAmount, risk, outcome: "declined" });
       return res.status(403).json({ success: false, status: "DECLINED_FRAUD_AI", risk, riskLevel });
+    }
+
+    // THROTTLE: elevated risk but not blocked — apply a stricter per-user rate limit.
+    // The financial limiter (30 req/min) still applies; this adds a hard cap of 3 req/min
+    // for throttled users to slow down suspicious velocity without fully blocking them.
+    if (fraudResult.enforcement === "THROTTLE") {
+      if (checkThrottle(senderId)) {
+        logger.warn("sendMoney: THROTTLE limit exceeded", { senderId, risk });
+        return res.status(429).json({ success: false, error: "THROTTLE_LIMIT_EXCEEDED", risk, riskLevel });
+      }
     }
 
     // ── ML routing (optional, 2s timeout) ────────────────────────────────
@@ -143,7 +157,7 @@ export async function sendMoney(req, res, next) {
     const { data: transferResult, error: transferError } = await supabaseAdmin.rpc("transfer_funds", {
       p_recipient_username: recipientUsername,
       p_amount: numericAmount,
-      p_message: String(message || "").slice(0, 200),
+      p_message: message || "",
       p_sender_id: senderId,
     });
 

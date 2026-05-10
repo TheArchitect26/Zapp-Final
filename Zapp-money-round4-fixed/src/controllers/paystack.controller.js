@@ -15,6 +15,7 @@
  */
 
 import { z } from "zod";
+import { randomUUID } from "crypto";
 import { supabaseAdmin } from "../lib/supabaseAdmin.js";
 import { logger } from "../lib/logger.js";
 import { db } from "../db/index.js";
@@ -79,7 +80,7 @@ export async function paystackInitialize(req, res, next) {
       userEmail = profile?.email || `${userId}@zapp.internal`;
     }
 
-    const reference = `zapp_${userId.slice(0, 8)}_${Date.now()}`;
+    const reference = `zapp_${randomUUID()}`;
 
     const paystackRes = await fetch(`${PAYSTACK_BASE}/transaction/initialize`, {
       method: "POST",

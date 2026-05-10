@@ -31,7 +31,7 @@ router.post("/:provider", captureRawBody, async (req, res) => {
       logger.warn("earn webhook: no secret configured (dev skip)", { provider });
     } else {
       logger.warn("earn webhook: no secret configured — rejecting", { provider });
-      return res.json({ received: true });
+      return res.status(401).json({ received: false, error: "WEBHOOK_NOT_CONFIGURED" });
     }
   } else {
     const signature = req.headers["x-webhook-signature"] || req.headers["x-signature"] || "";
@@ -44,7 +44,7 @@ router.post("/:provider", captureRawBody, async (req, res) => {
       crypto.timingSafeEqual(sigBuf, expBuf);
     if (!valid) {
       logger.warn("earn webhook: invalid signature", { provider });
-      return res.json({ received: true });
+      return res.status(401).json({ received: false, error: "INVALID_SIGNATURE" });
     }
   }
 

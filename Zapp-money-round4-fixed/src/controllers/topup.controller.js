@@ -12,7 +12,7 @@ export async function createCheckout(req, res, next) {
   try {
     const amount = Number(req.body.amount);
     if (!amount || amount < 10 || amount > 50000) {
-      return res.status(400).json({ success: false, error: "Amount must be between R10 and R50,000" });
+      return res.status(400).json({ success: false, error: "INVALID_AMOUNT" });
     }
 
     // Idempotency: require caller-supplied key — never generate server-side

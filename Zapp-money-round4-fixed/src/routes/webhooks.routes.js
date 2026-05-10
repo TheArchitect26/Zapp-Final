@@ -16,7 +16,6 @@ function verifyWebhookSignature(req, res, next) {
     }
     return res.status(500).json({ success: false, error: "WEBHOOK_NOT_CONFIGURED" });
   }
-
   const signature = req.headers["x-webhook-signature"] || "";
   const expected = crypto.createHmac("sha256", secret).update(req.rawBody).digest("hex");
 

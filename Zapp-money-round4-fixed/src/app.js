@@ -21,17 +21,20 @@ let transactionsRoutes, systemRoutes, replayRoutes;
 
 try {
   transactionsRoutes = (await import("./api/routes/transactions.routes.js")).default;
-} catch {
+} catch (e) {
+  if (e.code !== "ERR_MODULE_NOT_FOUND") throw e;
   logger.warn("transactions.routes.js not found");
 }
 try {
   systemRoutes = (await import("./api/routes/system.routes.js")).default;
-} catch {
+} catch (e) {
+  if (e.code !== "ERR_MODULE_NOT_FOUND") throw e;
   logger.warn("system.routes.js not found");
 }
 try {
   replayRoutes = (await import("./api/routes/replay.routes.js")).default;
-} catch {
+} catch (e) {
+  if (e.code !== "ERR_MODULE_NOT_FOUND") throw e;
   logger.warn("replay.routes.js not found");
 }
 

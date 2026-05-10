@@ -6,6 +6,7 @@ import { MoneyEngine } from "../core/moneyEngine.js";
 import { eventBus } from "../events/eventBus.js";
 import { EVENT_TYPES } from "../events/eventTypes.js";
 import { runFraudPipeline } from "../fraud/fraudPipeline.js";
+import { checkThrottle } from "../lib/throttle.js";
 
 const chargeSchema = z.object({
   amount: z.number().positive(),
@@ -47,6 +48,12 @@ export async function charge(req, res) {
     await learnFraud({ entityId, amount, velocity, risk, outcome: "declined" });
     broadcast("fraud_alert", { entityId, amount, risk, riskLevel, status: "DECLINED" });
     return res.json({ success: false, status: "DECLINED_FRAUD_AI", risk, riskLevel });
+  }
+
+  if (enforcement === "THROTTLE") {
+    if (checkThrottle(from)) {
+      return res.status(429).json({ success: false, error: "THROTTLE_LIMIT_EXCEEDED", risk, riskLevel });
+    }
   }
 
   const idempotencyKey = req.headers["idempotency-key"] || null;

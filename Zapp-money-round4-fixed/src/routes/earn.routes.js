@@ -90,6 +90,8 @@ router.post("/daily", async (req, res, next) => {
       .eq("user_id", userId)
       .maybeSingle();
 
+    // Pre-check only — two concurrent requests can both pass this before either calls the RPC.
+    // The authoritative once-per-day enforcement must be inside claim_daily_reward (DB-level).
     if (streak?.last_claim_date === today) {
       return res.status(409).json({ success: false, error: "ALREADY_CLAIMED_TODAY" });
     }

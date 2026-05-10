@@ -26,7 +26,8 @@ router.get("/audit-log", async (req, res, next) => {
 router.post("/kyc", async (req, res, next) => {
   try {
     const { userId, status, reason } = req.body ?? {};
-    if (!userId || !["verified", "rejected"].includes(status)) {
+    const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!userId || !uuidRe.test(userId) || !["verified", "rejected"].includes(status)) {
       return res.status(400).json({ success: false, error: "INVALID_INPUT" });
     }
     // Sanitize reason: plain string, max 500 chars

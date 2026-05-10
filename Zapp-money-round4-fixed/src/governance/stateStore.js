@@ -3,6 +3,7 @@
  * Falls back to in-memory if DB is unavailable (e.g. during tests).
  */
 import { db } from "../db/index.js";
+import { logger } from "../lib/logger.js";
 
 const memoryFallback = new Map();
 
@@ -21,6 +22,7 @@ export async function stateGet(key) {
     );
     return r.rows[0]?.value ?? null;
   } catch {
+    logger.warn("[stateStore] DB unavailable — using in-memory fallback. Governance state is NOT shared across instances.");
     return memoryFallback.get(key) ?? null;
   }
 }
@@ -37,6 +39,7 @@ export async function stateSet(key, value) {
       [key, JSON.stringify(value)]
     );
   } catch {
+    logger.warn("[stateStore] DB unavailable — using in-memory fallback. Governance state is NOT shared across instances.");
     memoryFallback.set(key, value);
   }
 }
@@ -59,6 +62,7 @@ export async function stateIncrement(key, field, by = 1) {
     );
     return Number(r.rows[0]?.value?.[field] ?? by);
   } catch {
+    logger.warn("[stateStore] DB unavailable — using in-memory fallback. Governance state is NOT shared across instances.");
     const cur = memoryFallback.get(key) ?? {};
     cur[field] = (cur[field] ?? 0) + by;
     memoryFallback.set(key, cur);

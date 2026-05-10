@@ -52,13 +52,16 @@ export async function processWithdrawal(withdrawalId) {
   }
 
   // ── Transition to PROCESSING (optimistic lock) ────────────────────────────
-  const { error: lockErr, count } = await supabaseAdmin
+  // .select() is required to get back rows — Supabase JS v2 does not populate
+  // `count` on update without it, so checking `count === 0` would never fire.
+  const { error: lockErr, data: locked } = await supabaseAdmin
     .from("withdrawal_requests")
     .update({ status: WITHDRAWAL_STATUS.PROCESSING, updated_at: new Date().toISOString() })
     .eq("id", withdrawalId)
-    .eq("status", WITHDRAWAL_STATUS.PENDING);
+    .eq("status", WITHDRAWAL_STATUS.PENDING)
+    .select();
 
-  if (lockErr || count === 0) {
+  if (lockErr || !locked?.length) {
     logger.warn("processWithdrawal: failed to lock record (already claimed?)", { withdrawalId });
     return { ok: false, status: "LOCK_FAILED" };
   }

@@ -7,6 +7,7 @@ const required = [
   "SUPABASE_URL",
   "SUPABASE_SERVICE_ROLE_KEY",
   "WEBHOOK_SECRET",
+  "PEACH_PAYMENTS_API_KEY",
 ];
 
 export function validateEnv() {

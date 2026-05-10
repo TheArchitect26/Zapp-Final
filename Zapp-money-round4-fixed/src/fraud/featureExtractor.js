@@ -1,10 +1,15 @@
 const historyByEntity = new Map();
+const MAX_ENTITY_HISTORY = 10_000; // cap number of tracked entities
 
 function updateHistory(entityId, point) {
   if (!entityId) return [];
   const existing = historyByEntity.get(entityId) || [];
   existing.push(point);
   const recent = existing.slice(-200);
+  if (!historyByEntity.has(entityId) && historyByEntity.size >= MAX_ENTITY_HISTORY) {
+    // Evict oldest entity to stay bounded
+    historyByEntity.delete(historyByEntity.keys().next().value);
+  }
   historyByEntity.set(entityId, recent);
   return recent;
 }

@@ -293,5 +293,90 @@ router.post("/paystack", captureRawBody, verifyPaystackSignature, async (req, re
   res.json({ received: true, event });
 });
 
+// ── MTN MoMo Collection callback (PUT from MoMo platform) ────────────────────
+router.put("/momo/collection", express.json(), async (req, res) => {
+  const { externalId, status, financialTransactionId } = req.body ?? {};
+  logger.info("MoMo collection callback", { externalId, status, financialTransactionId });
+
+  if (externalId && status === "SUCCESSFUL") {
+    const claimed = await db.query(
+      `UPDATE topups SET status = $1, provider_txn_id = $2, updated_at = NOW()
+       WHERE id = $3 AND status = 'pending'
+       RETURNING user_id, amount`,
+      ["completed", financialTransactionId, externalId]
+    ).catch(() => ({ rows: [] }));
+
+    const topup = claimed.rows[0];
+    if (topup) {
+      await supabaseAdmin.rpc("top_up_wallet", { p_amount: topup.amount, p_user_id: topup.user_id });
+      await supabaseAdmin.from("notifications").insert({
+        user_id: topup.user_id,
+        title: "MoMo Top-Up Successful",
+        message: `${topup.amount} added to your wallet via MoMo`,
+        type: "topup",
+      });
+    }
+  } else if (externalId && status === "FAILED") {
+    await db.query(
+      `UPDATE topup_requests SET status = 'failed', updated_at = NOW() WHERE merchant_transaction_id = $1`,
+      [externalId]
+    ).catch(() => {});
+  }
+
+  res.sendStatus(200);
+});
+
+// ── MTN MoMo Disbursement / Transfer callback ─────────────────────────────────
+router.put("/momo/disbursement", express.json(), async (req, res) => {
+  const { externalId, status } = req.body ?? {};
+  logger.info("MoMo disbursement callback", { externalId, status });
+
+  if (externalId && status === "FAILED") {
+    await supabaseAdmin.rpc("reverse_withdrawal", { p_withdrawal_id: externalId }).catch(() => {});
+    const { data: wr } = await supabaseAdmin
+      .from("withdrawal_requests").select("user_id, net_amount").eq("id", externalId).single();
+    if (wr) {
+      await supabaseAdmin.from("notifications").insert({
+        user_id: wr.user_id, title: "MoMo Payout Failed",
+        message: `Your ${wr.net_amount} MoMo payout failed and has been reversed`, type: "withdrawal",
+      });
+    }
+  }
+  res.sendStatus(200);
+});
+
+// ── MTN MoMo Deposit callback ─────────────────────────────────────────────────
+router.put("/momo/deposit", express.json(), async (req, res) => {
+  const { externalId, status, financialTransactionId } = req.body ?? {};
+  logger.info("MoMo deposit callback", { externalId, status });
+
+  if (externalId && status === "SUCCESSFUL") {
+    const claimed = await db.query(
+      `UPDATE topup_requests SET status = $1, provider_txn_id = $2, updated_at = NOW()
+       WHERE merchant_transaction_id = $3 AND status = 'pending'
+       RETURNING user_id, amount`,
+      ["completed", financialTransactionId, externalId]
+    ).catch(() => ({ rows: [] }));
+
+    const topup = claimed.rows[0];
+    if (topup) {
+      await supabaseAdmin.rpc("top_up_wallet", { p_amount: topup.amount, p_user_id: topup.user_id });
+      await supabaseAdmin.from("notifications").insert({
+        user_id: topup.user_id, title: "MoMo Deposit Successful",
+        message: `${topup.amount} deposited to your wallet via MoMo`, type: "topup",
+      });
+    }
+  }
+  res.sendStatus(200);
+});
+
+// ── MTN MoMo Refund callback ──────────────────────────────────────────────────
+router.put("/momo/refund", express.json(), async (req, res) => {
+  const { externalId, status } = req.body ?? {};
+  logger.info("MoMo refund callback", { externalId, status });
+  // Refund outcome — log only; no wallet adjustment needed (refund goes back to payer's MoMo)
+  res.sendStatus(200);
+});
+
 export default router;
 

@@ -1,22 +1,23 @@
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Zap, Lightbulb, Check, Copy } from "lucide-react";
+import { Zap, Lightbulb, Check, Copy, Smartphone } from "lucide-react";
 import { toast } from "sonner";
 import { useWallet } from "@/lib/store";
 import { useNetworks } from "@/lib/hooks/useNetworks";
 import ZappButton from "@/components/ZappButton";
+import MomoTopUp from "@/pages/MomoTopUp";
 
 export default function Buy() {
   const [searchParams] = useSearchParams();
-  const initialTab = searchParams.get("tab") === "electricity" ? "electricity" : "airtime";
-  const [tab, setTab] = useState<"airtime" | "electricity">(initialTab);
+  const initialTab = searchParams.get("tab") === "electricity" ? "electricity" : searchParams.get("tab") === "momo" ? "momo" : "airtime";
+  const [tab, setTab] = useState<"airtime" | "electricity" | "momo">(initialTab);
 
   return (
     <div className="min-h-screen pb-24 px-5 pt-12">
       <h1 className="text-xl font-bold tracking-tight mb-6">buy</h1>
       <div className="flex gap-2 mb-6">
-        {(["airtime", "electricity"] as const).map((t) => (
+        {(["airtime", "electricity", "momo"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -24,7 +25,9 @@ export default function Buy() {
               tab === t ? "bg-primary text-primary-foreground" : "bg-foreground/5 text-muted-foreground"
             }`}
           >
-            {t === "airtime" ? <Zap size={14} className="inline mr-1.5 -mt-0.5" /> : <Lightbulb size={14} className="inline mr-1.5 -mt-0.5" />}
+            {t === "airtime" && <Zap size={14} className="inline mr-1.5 -mt-0.5" />}
+            {t === "electricity" && <Lightbulb size={14} className="inline mr-1.5 -mt-0.5" />}
+            {t === "momo" && <Smartphone size={14} className="inline mr-1.5 -mt-0.5" />}
             {t}
           </button>
         ))}
@@ -34,9 +37,13 @@ export default function Buy() {
           <motion.div key="airtime" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
             <AirtimeForm />
           </motion.div>
-        ) : (
+        ) : tab === "electricity" ? (
           <motion.div key="electricity" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
             <ElectricityForm />
+          </motion.div>
+        ) : (
+          <motion.div key="momo" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
+            <MomoTopUp />
           </motion.div>
         )}
       </AnimatePresence>

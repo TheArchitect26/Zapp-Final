@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowDownToLine, Check, AlertCircle, Clock, Loader2, Banknote, Plus, ShieldAlert } from "lucide-react";
+import { ArrowDownToLine, Check, AlertCircle, Clock, Loader2, Banknote, Plus, ShieldAlert, Smartphone } from "lucide-react";
 import { useWallet, useProfile } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,6 +9,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import BottomSheet from "@/components/BottomSheet";
 import ZappButton from "@/components/ZappButton";
 import { toast } from "sonner";
+import { useMomoPayout, useMomoValidate } from "@/lib/hooks/useMomo";
 
 function useWithdrawals() {
   const { user } = useAuth();
@@ -87,6 +88,14 @@ export default function Withdraw() {
 
   const [pollingId, setPollingId] = useState<string | null>(null);
   const [liveStatus, setLiveStatus] = useState<string | null>(null);
+
+  // MoMo payout
+  const [momoSheetOpen, setMomoSheetOpen] = useState(false);
+  const [momoPhone, setMomoPhone] = useState("");
+  const [momoAmount, setMomoAmount] = useState("");
+  const momoPayout = useMomoPayout();
+  const { data: momoValidation } = useMomoValidate(momoPhone);
+  const momoTxStatus = momoPayout.status.data?.status;
 
   // Poll withdrawal status after submission
   useEffect(() => {
@@ -245,6 +254,34 @@ export default function Withdraw() {
         </div>
       )}
 
+      {/* MoMo payout card */}
+      <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+        className="glass-card rounded-2xl p-5 mb-6">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-9 h-9 rounded-full bg-yellow-500/20 flex items-center justify-center">
+            <Smartphone size={18} className="text-yellow-400" />
+          </div>
+          <div>
+            <p className="font-bold text-sm">MoMo Payout</p>
+            <p className="text-xs text-muted-foreground">Send directly to a mobile wallet</p>
+          </div>
+        </div>
+        {momoTxStatus === "SUCCESSFUL" ? (
+          <div className="flex items-center gap-2 text-sm text-accent font-semibold">
+            <Check size={16} /> Payout sent successfully
+          </div>
+        ) : momoTxStatus === "PENDING" || momoPayout.referenceId ? (
+          <div className="flex items-center gap-2 text-sm text-yellow-400">
+            <Loader2 size={14} className="animate-spin" /> Processing MoMo payout…
+          </div>
+        ) : (
+          <ZappButton variant="ghost" onClick={() => setMomoSheetOpen(true)}
+            disabled={wallet.balance < 1 || kycStatus !== "verified"}>
+            <Smartphone size={14} /> Withdraw via MoMo
+          </ZappButton>
+        )}
+      </motion.div>
+
       {/* Payout methods */}
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">payout methods</h2>
@@ -359,6 +396,54 @@ export default function Withdraw() {
             disabled={!methodLabel || !bankName || accountNumber.length < 4}>
             Save Payout Method
           </ZappButton>
+        </div>
+      </BottomSheet>
+
+      {/* MoMo Payout Sheet */}
+      <BottomSheet open={momoSheetOpen} onClose={() => setMomoSheetOpen(false)} title="MoMo Payout">
+        <div className="space-y-4 mt-4">
+          <div className="relative">
+            <input type="tel" value={momoPhone}
+              onChange={(e) => setMomoPhone(e.target.value.replace(/\D/g, ""))}
+              placeholder="MoMo phone number (MSISDN)"
+              className="w-full h-14 bg-foreground/5 rounded-lg px-4 pr-20 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 font-medium" />
+            {momoPhone.length >= 9 && (
+              <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold ${momoValidation?.active ? "text-accent" : "text-muted-foreground"}`}>
+                {momoValidation?.active ? "✓ active" : "checking…"}
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {[50, 100, 200].map((a) => (
+              <button key={a} onClick={() => setMomoAmount(String(a))}
+                disabled={a > wallet.balance}
+                className={`h-12 rounded-lg font-bold text-sm transition-all ${momoAmount === String(a) ? "bg-primary text-primary-foreground" : "bg-foreground/5 text-foreground"} ${a > wallet.balance ? "opacity-30" : ""}`}>
+                {a}
+              </button>
+            ))}
+          </div>
+          <input type="number" value={momoAmount} onChange={(e) => setMomoAmount(e.target.value)}
+            placeholder="Custom amount"
+            className="w-full h-14 bg-foreground/5 rounded-lg px-4 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 font-medium" />
+          <ZappButton
+            onClick={async () => {
+              const amt = parseFloat(momoAmount);
+              if (!momoPhone || amt <= 0) return;
+              if (amt > wallet.balance) { toast.error("Insufficient balance"); return; }
+              try {
+                await momoPayout.initiate.mutateAsync({ amount: amt, phone: momoPhone });
+                toast.success("MoMo payout initiated — check your phone");
+                setMomoSheetOpen(false);
+              } catch (err) {
+                toast.error((err as Error).message || "MoMo payout failed");
+              }
+            }}
+            loading={momoPayout.initiate.isPending}
+            disabled={!momoPhone || parseFloat(momoAmount) <= 0 || parseFloat(momoAmount) > wallet.balance}
+          >
+            <Smartphone size={16} /> Send via MoMo · {parseFloat(momoAmount) > 0 ? parseFloat(momoAmount).toFixed(2) : "0"}
+          </ZappButton>
+          <p className="text-xs text-center text-muted-foreground">Funds will be sent to the MoMo wallet at {momoPhone || "the number above"}</p>
         </div>
       </BottomSheet>
     </div>

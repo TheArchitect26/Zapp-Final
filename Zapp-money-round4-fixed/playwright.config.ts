@@ -1,6 +1,6 @@
-import { createLovableConfig } from "lovable-agent-playwright-config/config";
+import { createZConfig } from "Z-agent-playwright-config/config";
 
-export default createLovableConfig({
+export default createZConfig({
   // Add your custom playwright configuration overrides here
   // Example:
   // timeout: 60000,

@@ -51,6 +51,7 @@ import kycRoutes from "./routes/kyc.routes.js";
 import pushRoutes     from "./routes/push.routes.js";
 import adminRoutes     from "./routes/admin.routes.js";
 import earnRoutes      from "./routes/earn.routes.js";
+import momoRoutes      from "./routes/momo.routes.js";
 
 const app = express();
 
@@ -137,6 +138,7 @@ app.use("/api/v1/transfer",     requireAuth, financialLimiter, transferRoutes);
 app.use("/api/v1/withdraw",     requireAuth, financialLimiter, withdrawRoutes);
 app.use("/api/v1/topup",        requireAuth, financialLimiter, topupRoutes);
 app.use("/api/v1/earn",         requireAuth, financialLimiter, earnRoutes);
+app.use("/api/v1/momo",         requireAuth, financialLimiter, momoRoutes);
 app.use("/api/v1/kyc",          requireAuth, financialLimiter, kycRoutes);
 app.use("/api/v1/push",         requireAuth, pushRoutes);
 app.use("/api/v1/wallet",       requireAuth, walletRoutes);
